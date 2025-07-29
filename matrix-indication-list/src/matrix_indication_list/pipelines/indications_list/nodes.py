@@ -750,3 +750,31 @@ def compare_robokop_rtx_medi(robokop_indications:pd.DataFrame, rtx_indications:p
     plot_triple_venn(set(list(medi_dd)), set(list(rtx_dd)), set(list(robokop_dd)), "indications")
 
     return robokop_indications    
+
+
+def get_drug_ids(inList: pd.DataFrame, mapping_frame: pd.DataFrame, colnames_mapping: dict)->pd.DataFrame:
+    mapping = {}
+    labelmap = {}
+    for idx, row in mapping_frame.iterrows():
+        mapping[row[colnames_mapping.get("origin_string")]]=row[colnames_mapping.get('id')]
+        labelmap[row[colnames_mapping.get("origin_string")]]=row[colnames_mapping.get('label')]
+    ids = []
+    labels = []
+    for idx,row in inList.iterrows():
+        if row['drug name'] in mapping:
+            ids.append(mapping[row['drug name']])
+        else:
+            ids.append(row['final normalized drug id'])
+
+
+
+        if row['drug name'] in labelmap:
+            labels.append(labelmap[row['drug name']])
+        else:
+            labels.append(row['final normalized drug label'])
+            
+    inList['final normalized drug id'] = ids
+    inList['final normalized drug label'] = labels
+
+    return inList
+     

@@ -187,6 +187,15 @@ ema_11:
   type: pandas.ExcelDataset
   filepath: data/02_intermediate/ema/ema_indications.xlsx
 
+ema_drugs:
+  type: pandas.ExcelDataset
+  filepath: data/01_raw/ema-drugs.xlsx
+
+ema_drug_remap:
+  type: pandas.ExcelDataset
+  filepath: data/02_intermediate/ema/ema_drug_remap.xlsx
+
+
 ema_12:
   type: pandas.ExcelDataset
   filepath: data/02_intermediate/ema/ema_indications_deduplicated.xlsx
@@ -245,6 +254,16 @@ pmda_9:
 pmda_10:
   type: pandas.ExcelDataset
   filepath: data/02_intermediate/pmda/pmda_10.xlsx
+
+
+pmda_drugs:
+  type: pandas.ExcelDataset
+  filepath: data/01_raw/pmda-drugs.xlsx
+
+pmda_drug_remap:
+  type: pandas.ExcelDataset
+  filepath: data/02_intermediate/pmda/pmda_drug_remap.xlsx
+
 
 pmda_11:
   type: pandas.ExcelDataset

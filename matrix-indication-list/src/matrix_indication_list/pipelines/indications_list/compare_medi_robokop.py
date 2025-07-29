@@ -34,5 +34,4 @@ def compare_medi_robokop(medi_list: pd.DataFrame, robokop_list:pd.DataFrame) -> 
         "source":source_list,
         "target":target_list
     })
-        
-    
+

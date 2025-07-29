@@ -28,7 +28,15 @@ column_names:
   is_allergen_column: "is_allergen"
   is_diagnostic_column: "is_diagnostic_agent"
 
+pmda_mapping_columns:
+  origin_string: "Active Ingredient (underlined: new active ingredient)"
+  id: curie
+  label: curie_label
 
+ema_mapping_columns:
+  origin_string: "Active substance"
+  id: curie
+  label: curie_label
 
 biolink_type_disease: "DiseaseOrPhenotypicFeature"
 biolink_type_drug: "ChemicalOrDrugOrTreatment"
@@ -40,6 +48,7 @@ contraindications_structured_list_prompt: "Produce a list of contraindicated dis
 
 is_allergen_prompt: "Is the following active ingredient commonly used as an allergen for allergy testing? Respond only TRUE or FALSE. Provide no explanation. ACTIVE INGREDIENT: "
 is_radiolabel_prompt: "Is the following active ingredient commonly used as a radiolabel or diagnostic agent? Respond only TRUE or FALSE. Provide no explanation. ACTIVE INGREDIENT: "
+
 
 gemini_generation_config:
   - max_output_tokens: 8192
@@ -85,3 +94,6 @@ llm_best_id_tag_drug:
     model: gpt-4o
     prompt: "Return ONLY the best ontological ID (e.g., 'PUBCHEM:00000001') from the following to represent the provided drug concept. Do not include the label or item number. If no matches, return NONE."
     temperature: 0
+
+
+

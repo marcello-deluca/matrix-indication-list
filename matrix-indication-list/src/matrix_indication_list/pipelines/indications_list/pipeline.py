@@ -549,11 +549,21 @@ def create_pipeline(**kwargs) -> Pipeline:
             outputs="ema_11",
             name = "normalize-drug-ema",
         ),
+        node(
+            func=nodes.get_drug_ids,
+            inputs = [
+                "ema_11",
+                "ema_drugs",
+                "params:ema_mapping_columns"
+            ],
+            outputs = "ema_drug_remap",
+            name = "ema-remap"
+        ),
 
         node(
             func=nodes.deduplicate_entities,
             inputs=[
-                "ema_11",
+                "ema_drug_remap",
                 "params:column_names.llm_improved_id_column_drug",
                 "params:column_names.llm_improved_id_column",
                 "params:column_names.deduplication_column",
@@ -713,7 +723,6 @@ def create_pipeline(**kwargs) -> Pipeline:
             outputs = "pmda_10",
             name = "llm-id-improvement-drug-pmda"
         ),
-
         node(
             func=nodes.add_normalized_llm_tag_ids,
             inputs= [
@@ -725,11 +734,22 @@ def create_pipeline(**kwargs) -> Pipeline:
             outputs="pmda_11",
             name = "normalize-drug-pmda",
         ),
+        node(
+            func=nodes.get_drug_ids,
+            inputs = [
+                "pmda_11",
+                "pmda_drugs",
+                "params:pmda_mapping_columns"
+            ],
+            outputs = "pmda_drug_remap",
+            name = "pmda-remap"
+        ),
+
 
         node(
             func=nodes.deduplicate_entities,
             inputs=[
-                "pmda_11",
+                "pmda_drug_remap",
                 "params:column_names.llm_improved_id_column_drug",
                 "params:column_names.llm_improved_id_column",
                 "params:column_names.deduplication_column",
@@ -737,7 +757,12 @@ def create_pipeline(**kwargs) -> Pipeline:
             outputs="pmda_12",
             name="deduplicate-pmda"
         ),
+
         
+
+
+
+        # MERGE LISTS
         node(
             func=nodes.join_lists,
             inputs=[
