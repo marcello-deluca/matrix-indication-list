@@ -18,3 +18,5 @@ aiohttp
 openai
 ontobio
 networkx
+hdfs
+s3fs

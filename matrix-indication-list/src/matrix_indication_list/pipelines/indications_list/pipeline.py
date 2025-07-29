@@ -199,14 +199,14 @@ def create_pipeline(**kwargs) -> Pipeline:
                 "params:is_radiolabel_prompt",
                 "params:column_names.is_diagnostic_column"
             ],
-            outputs = "dailymed_contraindications_15",
+            outputs = "matrix_contraindications_list",
             name = "is_diagnostic_contra_fda",
         ),
 
         node(
             func=nodes.downfill_list_mondo,
             inputs=[
-                "dailymed_contraindications_15",
+                "matrix_contraindications_list",
                 "mondo_edges",
                 "mondo_nodes",
                 "params:column_names",
@@ -819,6 +819,16 @@ def create_pipeline(**kwargs) -> Pipeline:
             ],
             outputs="comparison_statistics",
             name="compare-indications-lists"
-            )
+        ),
+        node(
+            func=nodes.create_ingest_asset_orchard,
+            inputs = [
+                "matrix_indication_list",
+                "matrix_contraindications_list"
+            ],
+            outputs = "orchard_asset",
+            name = "save_orchard_asset"
+
+        )
 
     ])

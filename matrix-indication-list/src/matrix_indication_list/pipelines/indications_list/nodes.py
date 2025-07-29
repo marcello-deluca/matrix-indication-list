@@ -20,6 +20,7 @@ import re
 from functools import cache
 from openai import OpenAI
 import networkx as nx
+from pyspark.sql import SparkSession
 
 from matplotlib_venn import venn3
 import matplotlib.pyplot as plt
@@ -415,7 +416,7 @@ def resolve_concepts (inList: pd.DataFrame, column_to_resolve: str, out_column_i
                     print(f"too many failed requests for item {concept_str}")
                     success = True
                 try:
-                    curie, label = get_curie(string=concept_str, biolink_type=biolink_type, limit=30, autocomplete="false")
+                    curie, label = get_curie(string=concept_str, biolink_type=biolink_type, limit=30, autocomplete="true")
                     ids.append(curie[0])
                     labels.append(label[0])
                     success = True
@@ -581,6 +582,7 @@ def join_lists(fda_list: pd.DataFrame, ema_list: pd.DataFrame, pmda_list: pd.Dat
         column_names.get("llm_normalized_id_column_disease"):fda_list[column_names.get("llm_normalized_id_column_disease")],
         column_names.get("llm_normalized_label_column_disease"):fda_list[column_names.get("llm_normalized_label_column_disease")],
         column_names.get("deduplication_column"):fda_list[column_names.get("deduplication_column")],
+        "FDA": list(True for idx, row in fda_list.iterrows())
     })
     ema_list_to_merge = pd.DataFrame(data={ 
         column_names.get("llm_normalized_id_column_drug"):ema_list[column_names.get("llm_normalized_id_column_drug")],
@@ -588,6 +590,7 @@ def join_lists(fda_list: pd.DataFrame, ema_list: pd.DataFrame, pmda_list: pd.Dat
         column_names.get("llm_normalized_id_column_disease"):ema_list[column_names.get("llm_normalized_id_column_disease")],
         column_names.get("llm_normalized_label_column_disease"):ema_list[column_names.get("llm_normalized_label_column_disease")],
         column_names.get("deduplication_column"):ema_list[column_names.get("deduplication_column")],
+        "EMA": list(True for idx, row in ema_list.iterrows())
     })
     pmda_list_to_merge = pd.DataFrame(data={ 
         column_names.get("llm_normalized_id_column_drug"):pmda_list[column_names.get("llm_normalized_id_column_drug")],
@@ -595,6 +598,7 @@ def join_lists(fda_list: pd.DataFrame, ema_list: pd.DataFrame, pmda_list: pd.Dat
         column_names.get("llm_normalized_id_column_disease"):pmda_list[column_names.get("llm_normalized_id_column_disease")],
         column_names.get("llm_normalized_label_column_disease"):pmda_list[column_names.get("llm_normalized_label_column_disease")],
         column_names.get("deduplication_column"):pmda_list[column_names.get("deduplication_column")],
+        "PMDA": list(True for idx, row in pmda_list.iterrows())
     })
     merged_list = pd.concat([fda_list_to_merge, ema_list_to_merge, pmda_list_to_merge])
     clean_df = merged_list.drop_duplicates(subset=[column_names.get("deduplication_column")])
@@ -778,3 +782,37 @@ def get_drug_ids(inList: pd.DataFrame, mapping_frame: pd.DataFrame, colnames_map
 
     return inList
      
+
+def create_ingest_asset_orchard(indications_list: pd.DataFrame, contraindication_list: pd.DataFrame)->pd.DataFrame:
+    print(indications_list)
+    print(contraindication_list)
+
+    indications_list=indications_list.rename(columns={
+        "final normalized drug id": "kg_drug_id",
+        "final normalized disease id": "kg_disease_id"
+    })
+    indications_list["indication_contraindication"]=True
+
+    contraindication_list = contraindication_list.rename(columns={
+        "final normalized drug id": "kg_drug_id",
+        "final normalized disease id": "kg_disease_id",
+
+    })
+
+    print("renamed list columns")
+    
+    print(contraindication_list)
+    print(indications_list)
+
+    contraindication_list['indication_contraindication']=False
+
+    contraindications_selected = contraindication_list[["kg_drug_id", "kg_disease_id", "indication_contraindication"]]
+    indications_selected = indications_list[["kg_drug_id", "kg_disease_id", "indication_contraindication"]]
+
+    int_con = pd.concat([contraindications_selected, indications_selected])
+    print(int_con)
+    spark = SparkSession.builder.appName("PandasToSpark").getOrCreate()
+
+    return spark.createDataFrame(int_con)
+
+
