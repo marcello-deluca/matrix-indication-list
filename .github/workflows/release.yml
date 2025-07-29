@@ -81,5 +81,5 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: matrix-indication-list/data/03_primary/gt_orchard.parquet/ # Replace with the path to your file
-          asset_name: orchard_known_entities.xlsx              # Replace with the name you want for the uploaded asset
+          asset_name: orchard_known_entities             # Replace with the name you want for the uploaded asset
           asset_content_type: application/octet-stream
