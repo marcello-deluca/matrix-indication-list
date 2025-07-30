@@ -824,7 +824,8 @@ def create_pipeline(**kwargs) -> Pipeline:
             func=nodes.create_ingest_asset_orchard,
             inputs = [
                 "matrix_indication_list",
-                "matrix_contraindications_list"
+                "matrix_contraindications_list",
+                "params:orchard_asset_field_names"
             ],
             outputs = "orchard_asset",
             name = "save_orchard_asset"

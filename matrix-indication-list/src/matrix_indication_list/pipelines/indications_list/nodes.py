@@ -783,19 +783,23 @@ def get_drug_ids(inList: pd.DataFrame, mapping_frame: pd.DataFrame, colnames_map
     return inList
      
 
-def create_ingest_asset_orchard(indications_list: pd.DataFrame, contraindication_list: pd.DataFrame)->pd.DataFrame:
+def create_ingest_asset_orchard(indications_list: pd.DataFrame, contraindication_list: pd.DataFrame, col_names:dict)->pd.DataFrame:
     print(indications_list)
     print(contraindication_list)
 
+    drug_field = col_names.get('drug_field_name')
+    disease_field = col_names.get('disease_field_name')
+    ind_field = col_names.get('indication_field_name')
+
     indications_list=indications_list.rename(columns={
-        "final normalized drug id": "kg_drug_id",
-        "final normalized disease id": "kg_disease_id"
+        "final normalized drug id": drug_field,
+        "final normalized disease id": disease_field
     })
-    indications_list["indication_contraindication"]=True
+    indications_list[ind_field]=True
 
     contraindication_list = contraindication_list.rename(columns={
-        "final normalized drug id": "kg_drug_id",
-        "final normalized disease id": "kg_disease_id",
+        "final normalized drug id": drug_field,
+        "final normalized disease id": disease_field,
 
     })
 
@@ -804,10 +808,10 @@ def create_ingest_asset_orchard(indications_list: pd.DataFrame, contraindication
     print(contraindication_list)
     print(indications_list)
 
-    contraindication_list['indication_contraindication']=False
+    contraindication_list[ind_field]=False
 
-    contraindications_selected = contraindication_list[["kg_drug_id", "kg_disease_id", "indication_contraindication"]]
-    indications_selected = indications_list[["kg_drug_id", "kg_disease_id", "indication_contraindication"]]
+    contraindications_selected = contraindication_list[[drug_field, disease_field, ind_field]]
+    indications_selected = indications_list[[drug_field, disease_field, ind_field]]
 
     int_con = pd.concat([contraindications_selected, indications_selected])
     print(int_con)

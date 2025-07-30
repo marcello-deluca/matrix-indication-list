@@ -97,3 +97,7 @@ llm_best_id_tag_drug:
 
 
 
+orchard_asset_field_names:
+  drug_field_name: drug_kg_node_id
+  disease_field_name: disease_kg_node_id
+  indication_field_name: indication
