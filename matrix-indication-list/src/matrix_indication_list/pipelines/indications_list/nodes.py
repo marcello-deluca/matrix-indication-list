@@ -7,7 +7,11 @@ from tqdm import tqdm
 from io import StringIO
 import requests
 import base64
-import google.generativeai as genai
+#import google.generativeai as genai
+from google import genai
+from google.genai import types
+
+
 import vertexai
 from vertexai.generative_models import GenerativeModel, Part, SafetySetting, FinishReason
 import vertexai.preview.generative_models as generative_models
@@ -31,11 +35,7 @@ import numpy as np
 
 import pronto
 
-generation_config = {
-    "max_output_tokens":8192,
-    "temperature":0,
-    "top_p":0.95
-}
+
 
 # TESTING PARAMS
 testing = False
@@ -253,22 +253,33 @@ def standardize_pmda_rows(inList: pd.DataFrame, column_names:dict) -> pd.DataFra
 
 @cache
 def generate(input_text):
-        genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
-        
-        #vertexai.init(project="mtrx-wg2-modeling-dev-9yj", location="us-east1")
-        model = genai.GenerativeModel(
-            "gemini-2.0-flash",
-        )
-        responses = model.generate_content(
-        [input_text],
-        generation_config=generation_config,
-        stream=True,
-        )
-        resText = ""
-        for response in responses:
-            resText+=response.text
+    client = genai.Client(api_key=os.environ['GOOGLE_API_KEY'])
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=input_text,
+        config=types.GenerateContentConfig(
+            thinking_config=types.ThinkingConfig(thinking_budget=0) # no thinking
+        ),
+    )
+    return response.text
+
+
+# print(response.text)
+#         #vertexai.init(project="mtrx-wg2-modeling-dev-9yj", location="us-east1")
+#         model = genai.GenerativeModel(
+#             "gemini-2.5-flash",
+#         )
+#         responses = model.generate_content(
+#         [input_text],
+#         config=types.GenerateContentConfig(
+#         thinking_config=types.ThinkingConfig(thinking_budget=1024)),
+#         stream=True,
+#         )
+#         resText = ""
+#         for response in responses:
+#             resText+=response.text
             
-        return resText
+#         return resText
 
 def clean_empty_rows(inList, column_name) -> pd.DataFrame:
     indices_to_drop = []
