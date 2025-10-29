@@ -1,11 +1,9 @@
 from kedro.pipeline import Pipeline, pipeline, node
 from . import nodes, compare_medi_robokop
-from . import mine_indications
+from . import mine_indications, gemini_batch
 
 def create_pipeline(**kwargs) -> Pipeline:
     return pipeline([
-
-
 #########################################
 ### FDA CONTRAINDICATIONS ###############
 #########################################
@@ -375,6 +373,7 @@ def create_pipeline(**kwargs) -> Pipeline:
             name = "normalize-drugs-fda",
         ),
 
+
         node(
             func=nodes.deduplicate_entities,
             inputs=[
@@ -386,7 +385,18 @@ def create_pipeline(**kwargs) -> Pipeline:
             outputs="dailymed_12",
             name="deduplicate-fda"
         ),
-
+        node(
+            func=gemini_batch.process_batch_with_gemini_api,
+            inputs = [
+                "dailymed_12",
+                "params:indications_hyperrelations_prompt",
+                "params:gemini_env_var_personal",
+                "params:column_names.indications_text_column",
+                "params:column_names.hyperrelations_column",
+            ],
+            outputs = "dailymed_13",
+            name = "extract-hyperrelations-fda"
+        ),
 
 
 #########################################
@@ -774,6 +784,24 @@ def create_pipeline(**kwargs) -> Pipeline:
             outputs="matrix_indication_list",
             name="join_lists"
         ),
+        node(
+            func=nodes.extract_named_diseases,
+            inputs = [
+                "matrix_indication_list",
+                "params:column_names.drug_name_column",
+                "params:column_names.indications_text_column",
+                "params:column_names.hyperrelations_column",
+                "params:indications_hyperrelations_prompt",
+            ],
+            outputs = "indications_hyperrelational",
+            name = "extract-hyperrelations"
+        ),
+        node(
+            func=nodes.renormalize,
+            inputs = "matrix_indication_list",
+            outputs = "matrix_indication_list_renorm",
+            name = "renormalize-indication-list"
+        ),
 
         node(
             func=nodes.downfill_list_mondo,
@@ -827,9 +855,36 @@ def create_pipeline(**kwargs) -> Pipeline:
                 "matrix_contraindications_list",
                 "params:orchard_asset_field_names"
             ],
-            outputs = "orchard_asset",
+            outputs = [
+                "orchard_asset",
+                "orchard_asset_pandas"
+            ],
             name = "save_orchard_asset"
-
+        ),
+        node(
+            func=nodes.assess_onlabel,
+            inputs = [
+                "matrix_indication_list",
+                "matrix_contraindications_list",
+                "drug_list",
+            ],
+            outputs = "temp",
+            name = "assess-onlabel"
+        ),
+        node(
+            func=nodes.assess_onlabel,
+            inputs = [
+                "matrix_indication_list_downfilled",
+                "matrix_contraindications_list_downfilled",
+                "drug_list",
+            ],
+            outputs = "temp_2",
+            name = "assess-onlabel-downfilled"
+        ),
+        node(
+            func=nodes.generate_evaluation_set,
+            inputs = "dailymed_1",
+            outputs = "dailymed_evaluation_sample",
+            name = "get-dailymed-sample"
         )
-
     ])

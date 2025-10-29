@@ -122,12 +122,19 @@ dailymed_12:
   type: pandas.ExcelDataset
   filepath: data/02_intermediate/dailymed/fda_indications_deduplicated.xlsx
 
+dailymed_13:
+  type: pandas.ExcelDataset
+  filepath: data/02_intermediate/dailymed/fda_indications_deduplicated_hyperrelations.xlsx
 
 
 
 
 
 
+
+dailymed_evaluation_sample:
+  type: pandas.ExcelDataset
+  filepath: data/02_intermediate/dailymed/dailymed_sample.xlsx
 
 
 
@@ -280,6 +287,13 @@ matrix_indication_list:
   type: pandas.ExcelDataset
   filepath: data/03_primary/matrix_indication_list.xlsx
 
+indications_hyperrelational:
+  type: pandas.ExcelDataset
+  filepath: data/03_primary/matrix_indication_list_hyperrelational.xlsx
+
+matrix_indication_list_renorm:
+  type: pandas.ExcelDataset
+  filepath: data/03_primary/matrix_indication_list.xlsx
 
 mondo_edges:
   type: pandas.CSVDataset
@@ -346,3 +360,16 @@ orchard_asset:
   file_format: parquet
   save_args:
     mode: overwrite
+
+
+orchard_asset_pandas:
+  type: pandas.ExcelDataset
+  filepath: data/03_primary/gt_orchard.xlsx
+
+
+# SELF COVERAGE ASSESSMENT
+
+drug_list:
+  type: pandas.CSVDataset
+  filepath: data/08_reporting/indications_medi_coverage/drug_list_stringent.csv
+

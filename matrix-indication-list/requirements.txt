@@ -20,3 +20,4 @@ ontobio
 networkx
 hdfs
 s3fs
+matplotlib

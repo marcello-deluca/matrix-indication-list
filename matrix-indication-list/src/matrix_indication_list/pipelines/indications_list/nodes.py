@@ -7,14 +7,14 @@ from tqdm import tqdm
 from io import StringIO
 import requests
 import base64
+import google.generativeai as genai
 import vertexai
 from vertexai.generative_models import GenerativeModel, Part, SafetySetting, FinishReason
 import vertexai.preview.generative_models as generative_models
 import os
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ETke
 import json
 import zipfile
-import os
 import string
 import re
 from functools import cache
@@ -22,33 +22,14 @@ from openai import OpenAI
 import networkx as nx
 from pyspark.sql import SparkSession
 
-from matplotlib_venn import venn3
+from matplotlib_venn import venn3, venn2
 import matplotlib.pyplot as plt
 
 from ontobio import OntologyFactory
 from ontobio.ontol_factory import OntologyFactory
+import numpy as np
 
 import pronto
-
-# GLOBALS
-safety_settings = [
-        SafetySetting(
-            category=SafetySetting.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-            threshold=SafetySetting.HarmBlockThreshold.BLOCK_ONLY_HIGH
-        ),
-        SafetySetting(
-            category=SafetySetting.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-            threshold=SafetySetting.HarmBlockThreshold.BLOCK_ONLY_HIGH
-        ),
-        SafetySetting(
-            category=SafetySetting.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-            threshold=SafetySetting.HarmBlockThreshold.BLOCK_ONLY_HIGH
-        ),
-        SafetySetting(
-            category=SafetySetting.HarmCategory.HARM_CATEGORY_HARASSMENT,
-            threshold=SafetySetting.HarmBlockThreshold.BLOCK_ONLY_HIGH
-        ),
-    ]
 
 generation_config = {
     "max_output_tokens":8192,
@@ -186,8 +167,6 @@ def strip_spaces(myString):
     myString = _RE_STRIP_WHITESPACE.sub("", myString)
     return myString
 
-
-
 def mine_contraindications(dir: str) -> pd.DataFrame:
     contraindications_list = []
     ingredients_list = []
@@ -274,14 +253,15 @@ def standardize_pmda_rows(inList: pd.DataFrame, column_names:dict) -> pd.DataFra
 
 @cache
 def generate(input_text):
-        vertexai.init(project="mtrx-wg2-modeling-dev-9yj", location="us-east1")
-        model = GenerativeModel(
+        genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
+        
+        #vertexai.init(project="mtrx-wg2-modeling-dev-9yj", location="us-east1")
+        model = genai.GenerativeModel(
             "gemini-2.0-flash",
         )
         responses = model.generate_content(
         [input_text],
         generation_config=generation_config,
-        safety_settings=safety_settings,
         stream=True,
         )
         resText = ""
@@ -308,7 +288,6 @@ def extract_named_diseases(inList:pd.DataFrame, drug_names_column:str, passage_c
     diseases_mentioned = []
     # Fetch Columns
     indications_data = list(inList[passage_column])
-    active_ingredients_data = list(inList[drug_names_column])
     for index, item in tqdm(enumerate(indications_data), total=(limit if testing else len(indications_data))):
         if  (index < limit) or not testing:
             try:
@@ -381,7 +360,7 @@ def clean_list (inList: pd.DataFrame, disease_name_column:str, problem_strings:l
 
 @cache
 def nameres(itemRequest:str) -> str:
-    returned = (pd.read_json(StringIO(requests.get(itemRequest).text)))
+    returned = (pd.read_json(StringIO(requests.get(itemRequest, timeout=10).text)))
     resolvedCurie = returned.curie
     resolvedLabel = returned.label
     return resolvedCurie, resolvedLabel
@@ -404,9 +383,10 @@ def resolve_concepts (inList: pd.DataFrame, column_to_resolve: str, out_column_i
     ids = []
     labels = []
     err_msg = "ERROR"
+    total_failures = 0
     for idx, row in tqdm(inList.iterrows(), total=len(inList), desc="resolving entities from list..."):
         concept_str = row[column_to_resolve]
-        if not testing or idx < limit:
+        if not testing or idx<limit:
             success = False
             attempts = 0
             while not success:
@@ -414,11 +394,16 @@ def resolve_concepts (inList: pd.DataFrame, column_to_resolve: str, out_column_i
                     ids.append(err_msg)
                     labels.append(err_msg)
                     print(f"too many failed requests for item {concept_str}")
+                    total_failures+=1
                     success = True
                 try:
                     curie, label = get_curie(string=concept_str, biolink_type=biolink_type, limit=30, autocomplete="true")
-                    ids.append(curie[0])
-                    labels.append(label[0])
+                    if curie is not None and label is not None:
+                        ids.append(curie[0])
+                        labels.append(label[0])
+                    else:
+                        ids.append(err_msg)
+                        labels.append(err_msg)
                     success = True
                 except Exception as e:
                     print(e)
@@ -427,6 +412,7 @@ def resolve_concepts (inList: pd.DataFrame, column_to_resolve: str, out_column_i
         inList = inList.head(limit) 
     inList[out_column_ids] = ids
     inList[out_column_labels] = labels
+    print(f"Finished resolving. {total_failures} total failures to resolve. Returning new dataframe with added columns {out_column_ids}, {out_column_labels}")
     return clean_bad_entries(inList, out_column_ids, err_msg)
 
 def check_nameres_single_entry(input_disease: str, id_label: str, params: dict) -> str:
@@ -575,12 +561,24 @@ def deduplicate_entities(inList: pd.DataFrame, drug_id_column: str, disease_id_c
     clean_list = inList.drop_duplicates(subset=deduplication_column, keep='first')
     return clean_list
 
+def combine_rows(series):
+        unique_values = series.dropna().unique()
+        if len(unique_values) == 0:
+            return np.nan
+        elif len(unique_values) == 1:
+            return unique_values[0]
+        else:
+            # If multiple non-null values exist, join them with semicolons
+            return '; '.join(str(x) for x in unique_values)
+
 def join_lists(fda_list: pd.DataFrame, ema_list: pd.DataFrame, pmda_list: pd.DataFrame, column_names:dict) -> pd.DataFrame:
     fda_list_to_merge = pd.DataFrame(data={ 
         column_names.get("llm_normalized_id_column_drug"):fda_list[column_names.get("llm_normalized_id_column_drug")],
         column_names.get("llm_normalized_label_column_drug"):fda_list[column_names.get("llm_normalized_label_column_drug")],
         column_names.get("llm_normalized_id_column_disease"):fda_list[column_names.get("llm_normalized_id_column_disease")],
         column_names.get("llm_normalized_label_column_disease"):fda_list[column_names.get("llm_normalized_label_column_disease")],
+        column_names.get("indications_text_column"):fda_list[column_names.get("indications_text_column")],
+        column_names.get("disease_name_column"):fda_list[column_names.get("disease_name_column")],
         column_names.get("deduplication_column"):fda_list[column_names.get("deduplication_column")],
         "FDA": list(True for idx, row in fda_list.iterrows())
     })
@@ -589,6 +587,8 @@ def join_lists(fda_list: pd.DataFrame, ema_list: pd.DataFrame, pmda_list: pd.Dat
         column_names.get("llm_normalized_label_column_drug"):ema_list[column_names.get("llm_normalized_label_column_drug")],
         column_names.get("llm_normalized_id_column_disease"):ema_list[column_names.get("llm_normalized_id_column_disease")],
         column_names.get("llm_normalized_label_column_disease"):ema_list[column_names.get("llm_normalized_label_column_disease")],
+        column_names.get("indications_text_column"):ema_list[column_names.get("indications_text_column")],
+        column_names.get("disease_name_column"):ema_list[column_names.get("disease_name_column")],
         column_names.get("deduplication_column"):ema_list[column_names.get("deduplication_column")],
         "EMA": list(True for idx, row in ema_list.iterrows())
     })
@@ -597,10 +597,14 @@ def join_lists(fda_list: pd.DataFrame, ema_list: pd.DataFrame, pmda_list: pd.Dat
         column_names.get("llm_normalized_label_column_drug"):pmda_list[column_names.get("llm_normalized_label_column_drug")],
         column_names.get("llm_normalized_id_column_disease"):pmda_list[column_names.get("llm_normalized_id_column_disease")],
         column_names.get("llm_normalized_label_column_disease"):pmda_list[column_names.get("llm_normalized_label_column_disease")],
+        column_names.get("indications_text_column"):pmda_list[column_names.get("indications_text_column")],
+        column_names.get("disease_name_column"):pmda_list[column_names.get("disease_name_column")],
         column_names.get("deduplication_column"):pmda_list[column_names.get("deduplication_column")],
         "PMDA": list(True for idx, row in pmda_list.iterrows())
     })
-    merged_list = pd.concat([fda_list_to_merge, ema_list_to_merge, pmda_list_to_merge])
+    merged_list = pd.concat([fda_list_to_merge, ema_list_to_merge, pmda_list_to_merge], ignore_index=True)
+    merged_df = merged_list.groupby('drug|disease', as_index=False).agg(combine_rows)
+
     clean_df = merged_list.drop_duplicates(subset=[column_names.get("deduplication_column")])
     return clean_df
 
@@ -691,7 +695,6 @@ def assess_disease_list_coverage (disease_list: pd.DataFrame, indication_list: p
     print(f"{len(disease_list_coverage)} not covered in indications list")
     return None
     
-
 
 def plot_triple_venn(set1, set2, set3, title):
     out = venn3([set(set1), set(set2), set(set3)], ("MeDI", "RTX", "ROBOKOP"))
@@ -796,20 +799,14 @@ def create_ingest_asset_orchard(indications_list: pd.DataFrame, contraindication
         "final normalized disease id": disease_field
     })
     indications_list[ind_field]=True
-
     contraindication_list = contraindication_list.rename(columns={
         "final normalized drug id": drug_field,
         "final normalized disease id": disease_field,
-
     })
-
     print("renamed list columns")
-    
     print(contraindication_list)
     print(indications_list)
-
     contraindication_list[ind_field]=False
-
     contraindications_selected = contraindication_list[[drug_field, disease_field, ind_field]]
     indications_selected = indications_list[[drug_field, disease_field, ind_field]]
 
@@ -817,6 +814,152 @@ def create_ingest_asset_orchard(indications_list: pd.DataFrame, contraindication
     print(int_con)
     spark = SparkSession.builder.appName("PandasToSpark").getOrCreate()
 
-    return spark.createDataFrame(int_con)
+    return spark.createDataFrame(int_con), int_con
 
 
+
+def assess_onlabel(indications_list: pd.DataFrame, contraindications: pd.DataFrame, druglist: pd.DataFrame) -> pd.DataFrame:
+    drugs_druglist = set(druglist['curie_label'])
+    drugs_indications_list = set(indications_list['final normalized drug label'])
+    indications_not_drugs = drugs_indications_list.difference(drugs_druglist)
+    print(len(indications_not_drugs))
+    print(indications_not_drugs)
+
+    drugs_not_indications = drugs_druglist.difference(drugs_indications_list)
+    print("\n\n\n\n\n")
+    print(len(drugs_not_indications))
+    print(drugs_not_indications)
+
+    drugs_and_indications = drugs_druglist.intersection(drugs_indications_list)
+    print("\n\n\n\n\n")
+    print(len(drugs_and_indications))
+    print(drugs_and_indications)
+
+    out = venn2([drugs_indications_list, drugs_druglist],("Indications List", "Drugs List"))
+    for text in out.set_labels:
+        text.set_fontsize(22)
+    for text in out.subset_labels:
+        text.set_fontsize(22)
+    plt.show()
+
+    categories = ['Indications (d.f.)', 'Contraindications (d.f.)']
+    n_ind = len(indications_list)
+    n_con = len(contraindications)
+    values = [n_ind, n_con]
+
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=(10, 6))
+    plt.rcParams['font.family'] = 'Arial'
+
+    # Create bars with custom colors
+    bars = ax.bar(categories, values, 
+                color=['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'],
+                edgecolor='black',
+                linewidth=1.2)
+
+    # Remove top and right spines (boundaries)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    # Customize the chart with updated font sizes
+    ax.set_xlabel('List', fontsize=24, fontweight='bold')
+    ax.set_ylabel('Number of Connections', fontsize=24, fontweight='bold')
+    ax.set_title('MeDI On-Label', fontsize=12, fontweight='bold')
+
+    # Increase tick label font size
+    ax.tick_params(axis='both', which='major', labelsize=24)
+
+    # Add value labels on top of bars
+    for bar in bars:
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height + 1,
+                f'{height}', ha='center', va='bottom', fontsize=24)
+
+    # Add grid for better readability
+    #ax.grid(axis='y', alpha=0.3, linestyle='--')
+    ax.set_axisbelow(True)
+
+    plt.tight_layout()
+    plt.show()
+
+
+    return druglist
+
+import random
+
+def random_selections(items, n, replace=False):
+    """
+    Generate N random selections from a set of M items.
+    
+    Args:
+        items: List, tuple, or set of items to select from
+        n: Number of selections to make
+        replace: If True, allow selecting the same item multiple times
+                If False, each item can only be selected once
+    
+    Returns:
+        List of randomly selected items
+    """
+    items_list = list(items)  # Convert to list if it's a set
+    
+    if replace:
+        # With replacement - can select same item multiple times
+        return random.choices(items_list, k=n)
+    else:
+        # Without replacement - each item selected at most once
+        if n > len(items_list):
+            raise ValueError(f"Cannot select {n} items without replacement from {len(items_list)} items")
+        return random.sample(items_list, n)
+
+
+def generate_evaluation_set(labels: pd.DataFrame) -> pd.DataFrame:
+    """
+    Select 100 random items with corrected IDs from WHO listed regulatory agencies to evaluate entity linking quality
+    
+    Args:
+        usa, eur, jpn: respective lists post-LLM QC
+    
+    Returns:
+        List of randomly selected items
+    """
+    return labels.iloc[random_selections(range(len(labels)), 100)]
+
+
+def renormalize(df: pd.DataFrame) -> pd.DataFrame:
+    new_drug_ids = []
+    new_drug_labels = []
+
+    new_disease_ids = []
+    new_disease_labels = []
+
+    dr_cache = {}
+    di_cache = {}
+
+    for idx, row in tqdm(df.iterrows(), total = len(df), desc="renormalizing list"):
+        dr = row['final normalized drug id']
+        di = row['final normalized disease id']
+
+        if dr in dr_cache:
+            ids, label = dr_cache[dr]
+        else:
+            ids, label = normalize(dr)
+            dr_cache[dr] = ids, label
+
+        new_drug_ids.append(ids)
+        new_drug_labels.append(label)
+
+        if di in di_cache:
+            ids, label = di_cache[di]
+        else:
+            ids, label = normalize(di)
+            di_cache[di]=ids, label
+        new_disease_ids.append(ids)
+        new_disease_labels.append(label)
+
+
+    df['curie_drug']=new_drug_ids
+    df['curie_label_drug']=new_drug_labels
+
+    df['curie_disease']=new_disease_ids
+    df['curie_label_disease']=new_disease_labels
+    return df
