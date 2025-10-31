@@ -291,6 +291,11 @@ indications_hyperrelational:
   type: pandas.ExcelDataset
   filepath: data/03_primary/matrix_indication_list_hyperrelational.xlsx
 
+mondo_sufficiency:
+  type: pandas.ExcelDataset
+  filepath: data/03_primary/mondo_sufficiency.xlsx
+
+
 matrix_indication_list_renorm:
   type: pandas.ExcelDataset
   filepath: data/03_primary/matrix_indication_list.xlsx

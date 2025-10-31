@@ -1,6 +1,6 @@
 from kedro.pipeline import Pipeline, pipeline, node
 from . import nodes, compare_medi_robokop
-from . import mine_indications, gemini_batch
+from . import mine_indications, gemini_batch, check_mondo_sufficiency
 
 def create_pipeline(**kwargs) -> Pipeline:
     return pipeline([
@@ -795,6 +795,15 @@ def create_pipeline(**kwargs) -> Pipeline:
             ],
             outputs = "indications_hyperrelational",
             name = "extract-hyperrelations"
+        ),
+        node(
+            func=check_mondo_sufficiency.evaluate_sufficiency,
+            inputs = [
+                "indications_hyperrelational",
+                "params:mondo_sufficient_prompt",
+            ],
+            outputs = "mondo_sufficiency",
+            name = "evaluate_mondo_sufficiency"
         ),
         node(
             func=nodes.renormalize,

@@ -53,6 +53,8 @@ gemini_env_var_personal: "GEMINI_API_KEY_PERSONAL"
 is_allergen_prompt: "Is the following active ingredient commonly used as an allergen for allergy testing? Respond only TRUE or FALSE. Provide no explanation. ACTIVE INGREDIENT: "
 is_radiolabel_prompt: "Is the following active ingredient commonly used as a radiolabel or diagnostic agent? Respond only TRUE or FALSE. Provide no explanation. ACTIVE INGREDIENT: "
 
+mondo_sufficient_prompt: "I supply two descriptions of a disease below. The first is the name of a disease extracted directly from a drug label. The second is the name of the ontological concept identified by applying an entity linking process to the disease acquired from the drug label. If the ontological concept precisely describes the disease name extracted from the label, return TRUE. If the ontological concept does not match or omits critical details, return FALSE. Return TRUE or FALSE only; do not provide any explanation. "
+
 gemini_generation_config:
   - max_output_tokens: 8192
   - temperature: 0
@@ -69,7 +71,6 @@ strings_to_clean_from_disease_list:
   - "ERROR"
 
 cleaning_regex_sub_pattern: "[^A-Za-z0-9 ]+"
-
 
 id_correct_incorrect_tag_disease:
   model_params:
