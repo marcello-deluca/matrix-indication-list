@@ -1,6 +1,8 @@
 # matrix-indication-list
 The aim of the MATRIX indication list is to provide a set of ground truths that can be used as training data for predictive models for drug repurposing.
 
+This code has been relocated to https://github.com/everycure-org/medic. Please use this page for future requests.
+
 ## Triggering a release
 
 Create a new tag locally
